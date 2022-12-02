@@ -28,8 +28,22 @@ struct ChallengeScreen: View {
     }
     
     private var contentLayer: some View {
-        VStack(alignment: .leading) {
+        HStack(alignment: .top, spacing: 16) {
+            inputColumn
+                .frame(width: 500)
+            
+            outputColumn
+                .frame(maxWidth: .infinity)
+        }
+    }
+    
+    private var inputColumn: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Challenge")
+                .font(.largeTitle)
+            
             Text("Enter the input for the challenge of \(challenge.date.formatted(for: .description)):")
+                .onTapGesture(perform: openChallengeInBrowser)
             
             TextEditor(text: $input)
                 .font(.system(.body, design: .monospaced, weight: .medium))
@@ -38,13 +52,55 @@ struct ChallengeScreen: View {
                 .padding(.vertical, 8)
                 .padding(.horizontal, 4)
                 .background(Color.textEditorBackground)
-                .border(Color.accentColor)
+                .border(cornerRadius: 5)
             
-            HStack {
-                Spacer()
-                Button("Solve", action: solveChallenge)
-            }
+            Button(action: solveChallenge, label: solveButtonLabel)
+                .buttonStyle(.borderedProminent)
         }
+    }
+    
+    private var outputColumn: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Solution")
+                .font(.largeTitle)
+            
+            solutionInfo
+        }
+    }
+    
+    @ViewBuilder private var solutionInfo: some View {
+        if !solutionPart1.isEmpty, !solutionPart2.isEmpty {
+            Text("Enter this for part 1:")
+            
+            CopyableText(solutionPart1)
+                .background(Color.textEditorBackground)
+                .border(cornerRadius: 5)
+            
+            Text("Enter this for part 2:")
+            
+            CopyableText(solutionPart2)
+                .frame(height: 30)
+                .frame(maxWidth: .infinity)
+                .background(Color.textEditorBackground)
+                .border(cornerRadius: 5)
+        } else {
+            Text("To get a solution please go to the challenge website, copy the challenge input and paste it on the left. When you're ready use the solve button below the input.")
+            
+            Button(action: openChallengeInBrowser, label: openChallengeInBrowserButtonLabel)
+                .buttonStyle(.borderedProminent)
+        }
+    }
+    
+    private func solveButtonLabel() -> some View {
+        Text("Solve")
+            .frame(height: 30)
+            .frame(maxWidth: .infinity)
+    }
+    
+    private func openChallengeInBrowserButtonLabel() -> some View {
+        Text("Open Challenge in your default Browser")
+            .frame(height: 30)
+            .frame(maxWidth: .infinity)
     }
     
     private func alertContent() -> Alert {
@@ -55,10 +111,11 @@ struct ChallengeScreen: View {
     }
     
     private func solveChallenge() {
+        guard !input.isEmpty else { return }
         guard let solver = AdventOfCode2022.solver(for: challenge, with: input) else { return handleUnavailableChallenge() }
         Storage.shared.save(input, as: .input(challenge: challenge))
-        alertType = .solution(challenge: challenge, solver: solver)
-        showAlert = true
+        solutionPart1 = solver.solutionPart1
+        solutionPart2 = solver.solutionPart2
     }
     
     private func handleUnavailableChallenge() {
@@ -68,6 +125,15 @@ struct ChallengeScreen: View {
     
     private func fillInputFromStorage() {
         input = Storage.shared.getString(for: .input(challenge: challenge), otherwise: "")
+        if !input.isEmpty { solveChallenge() }
+    }
+    
+    private func openChallengeInBrowser() {
+        #if os(macOS)
+            NSWorkspace.shared.open(challenge.url)
+        #else
+            UIApplication.shared.open(challenge.url)
+        #endif
     }
     
     private enum AlertType {
@@ -89,6 +155,62 @@ struct ChallengeScreen: View {
             }
         }
         
+    }
+    
+}
+
+struct CopyableText: View {
+    
+    private let text: String
+    
+    init(_ text: String) {
+        self.text = text
+    }
+    
+    var body: some View {
+        ZStack {
+            textDisplay
+                .background(Color.textEditorBackground)
+                .border(cornerRadius: 5)
+            
+            copyButton
+        }
+    }
+    
+    private var textDisplay: some View {
+        HStack(spacing: 0) {
+            Text(text)
+                .font(.system(.body, design: .monospaced, weight: .medium))
+                .lineSpacing(8)
+                .padding(.vertical, 8)
+                .padding(.leading, 8)
+            
+            Spacer(minLength: 0)
+        }
+    }
+    
+    private var copyButton: some View {
+        HStack(spacing: 0) {
+            Spacer(minLength: 0)
+            
+            Button(action: copyText, label: copyButtonLabel)
+                .buttonStyle(.borderedProminent)
+                .padding(.trailing, 8)
+        }
+    }
+    
+    private func copyText() {
+        #if os(macOS)
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+        #else
+            UIPasteboard.general.string = text
+        #endif
+    }
+    
+    private func copyButtonLabel() -> some View {
+        Image(systemName: "doc.on.doc")
+            .renderingMode(.original)
     }
     
 }
